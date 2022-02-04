@@ -1,0 +1,121 @@
+(() => {
+//Defining some defaults:
+let lanternAnimation = {"type": "torch", "speed" : 3, "intensity": 2};
+let defaultLight = {"dim" : 0, "bright" : 0, "angle" : 360, "color" : undefined, "alpha" : 0.5, "coloration" : 1, "contrast" : 0, "gradual" : true, "luminosity" : 0.5, "saturation" : 0, "shadows" : 0,
+	"animation" : { 
+		"intensity" : 5,
+		"reverse" : false,
+		"speed" : 5,
+		"type" : undefined
+	},
+	"darkness" : {
+		"max" : 1,
+		"min" : 0
+	}
+};
+
+//Alert the user if there is no token selected:
+if(canvas.tokens.controlled.length == 0) {
+	ui.notifications.error("Select a token first.");
+	return;
+}
+
+//function for updating the token data and setting flags:
+function tokenUpdate(data) {
+	//User selected the Revert option. If data is null, that means it will try to use data that was previously stored in the "lightpickerRevert" flag on the token.
+	if(data==null)
+		canvas.tokens.controlled.map(token => {
+			//Remove the flag that protects the settings flag from being overridden.
+			token.document.unsetFlag("core", "lightPickerSet");
+			
+			let flagData = token.document.getFlag("core", "lightpickerRevert");
+			
+			//If there are no settings saves to revert to, revert to the default
+			if(typeof(flagData) == "undefined") {
+				token.document.update({"light" : defaultLight});
+			} //if there are, revert to those settings and clear the flag.
+			else {
+				token.document.update({"light" : flagData});
+				token.document.unsetFlag("core","lightpickerRevert");
+			}
+		});
+	else {
+	    //Create a new data object that merges settings from the default with the settings passed to this function.
+		let mergedData = Object.assign(Object.assign({},defaultLight),data);
+		
+		//Object.assign doesn't merge nested objects, so here it goes back and re-merges the animation and darkness tags.
+		if(data.animation != undefined)
+			mergedData.animation = Object.assign(Object.assign({},defaultLight.animation),data.animation);
+		if(data.darkness != undefined)
+			mergedData.darkness = Object.assign(Object.assign({},defaultLight.darkness),data.darkness);
+		
+		
+		console.log(mergedData);
+		
+		//For each selected token, set the light data to the new merged data object.
+		//If the flag "lightPickerSet" is false, this means it's safe to override the settings stored in the flag.
+		//After that, set the LightPickerSet flag to true so subsequence light picks don't override the initial settings.
+		canvas.tokens.controlled.map(token => {
+			if(!token.document.getFlag("core","lightPickerSet")) {
+				token.document.setFlag("core","lightpickerRevert", token.data.light);
+				token.document.setFlag("core","lightPickerSet", true);
+			}
+			token.document.update({light : mergedData});
+		});
+	}
+}
+
+//Create and display a dialog box with all the available options.
+//Each options passes an object to the tokenUpdate function with all the settings that divert from the ones in the defaultLight object.
+//If the user presses the "revert" button, it passes a null to the function, telling it to use light settings stored as a flag on the token object.
+let dialogEditor = new Dialog({
+	title: `Token Light Picker`,
+	content: `<h2>Pick the light source the selected token is holding.</h2>`,
+	buttons: {
+	none: {
+		label: `None`,
+		callback: () => tokenUpdate(defaultLight)
+	},
+	torch: {
+		label: `Torch`,
+		callback: () => tokenUpdate({"dim": 40, "bright": 20, "color" : "#ffdd00", "alpha": 0.7, "luminosity": 0.4, "animation": {"type": "torch", "speed": 2, "intensity": 5}})
+	},
+	light: {
+		label: `Light cantrip`,
+		callback: () => tokenUpdate({"dim": 40, "bright": 20, "color" : "#fcfcf7"})
+	},
+	lamp: {
+		label: `Lamp`,
+		callback: () => tokenUpdate({"dim": 45, "bright": 15, "color": "#f9d939", "alpha": 0.8, "luminosity": 0.4, "animation": lanternAnimation})
+	},
+	bullseye: {
+		label: `Bullseye Lantern`,
+		callback: () => tokenUpdate({"dim": 120, "bright": 60, "angle": 45, "color" : "#f9d939", alpha: 0.9, "luminosity": 0.4, "animation": lanternAnimation})
+	},
+	hoodedOpen: {
+		label: `Hooded Lantern (Open)`,
+		callback: () => tokenUpdate({"dim": 60, "bright": 30, "color": "#f9d939", "alpha": 0.7, "luminosity": 0.4, "animation": lanternAnimation})
+	},
+	hoodedClosed: {
+		label: `Hooded Lantern (Closed)`,
+		callback: () => tokenUpdate({"dim": 5, "color": "#f9d939", "alpha": 0.7, "luminosity": 0.4, "animation": lanternAnimation})
+	},
+	darkness: {
+		label: `Darkness spell`,
+		callback: () => tokenUpdate({"bright": 15, "dim" : 15, "color": "#ffffff", "luminosity": -0.75, "shadows" : 0.41, "animation": {"type": "ghost", "intensity": 9, "speed": 4}})
+	},
+	revert: {
+		label: `Revert`,
+		callback: () => tokenUpdate(null)
+	},
+	close: {
+		icon: "<i class='fas fa-tick'></i>",
+		label: `Close`
+	},
+	},
+	default: "close",
+	close: () => {}
+});
+
+dialogEditor.render(true);
+})();
